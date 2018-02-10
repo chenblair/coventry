@@ -49,8 +49,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         TextView tv = (TextView) findViewById(R.id.sample_text);
         tv.setText(stringFromJNI());
 
-        startLocationListener();
-        //startPicker();
+        //startLocationListener();
+        startPicker();
 
     }
 
