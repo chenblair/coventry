@@ -1,13 +1,18 @@
 package com.blairc.conventry;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -57,7 +62,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
             Toast.makeText(this, toastMsg, Toast.LENGTH_LONG).show();
             double latitude = place.getLatLng().latitude;
             double longitude = place.getLatLng().longitude;
-
         }
     }
 
@@ -81,6 +85,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
             public void onLocationChanged(Location location) {
                 double latitude = location.getLatitude();
                 double longitude = location.getLongitude();
+                Log.v("GPS:", "IN ON LOCATION CHANGE, lat=" + latitude + ", lon=" + longitude);
                 Toast.makeText(getApplicationContext(), Double.toString(latitude), Toast.LENGTH_LONG).show();
             }
 
@@ -97,13 +102,13 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
             }
         };
 
-        /*if (ContextCompat.checkSelfPermission(MainActivity,
+        if (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
 
             // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity,
-                    //Manifest.permission.ACCESS_FINE_LOCATION))
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                    Manifest.permission.ACCESS_FINE_LOCATION)) {
 
                 // Show an explanation to the user *asynchronously* -- don't block
                 // this thread waiting for the user's response! After the user
@@ -113,18 +118,17 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
                 // No explanation needed, we can request the permission.
 
-                ActivityCompat.requestPermissions(thisActivity,
-                        new String[]{Manifest.permission.READ_CONTACTS},
-                        MY_PERMISSIONS_REQUEST_READ_CONTACTS);
-
-                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
-                // app-defined int constant. The callback method gets the
-                // result of the request.
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        1);
             }
-        }*/
+        }
         try {
-            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 1, locationListener);
+            //lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+            lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
+            //lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 1, locationListener);
         } catch (SecurityException se) {
+            se.printStackTrace();
         }
     }
 
