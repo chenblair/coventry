@@ -27,16 +27,11 @@ static void playerEventCallback(void * __unused clientData, SuperpoweredAdvanced
 // This is called periodically by the media server.
 static bool audioProcessing(void * __unused clientdata, short int *audioInputOutput, int numberOfSamples, int __unused samplerate) {
     if (player->process(floatBuffer, false, (unsigned int)numberOfSamples)) {
-        //spatializer->azimuth = 90;
-        //spatializer->elevation = 0;
-        //spatializer->sound2 = false;
         //buffer is interleaved
         if(spatializer->process(floatBuffer, NULL, floatBuffer, NULL, (unsigned int)numberOfSamples, false)) {
             SuperpoweredFloatToShortInt(floatBuffer, audioInputOutput, (unsigned int)numberOfSamples);
             return true;
         } else return false;
-
-        return true;
     } else return false;
 }
 
@@ -50,6 +45,7 @@ extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_SetTempF
 extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_StartAudio(JNIEnv * __unused javaEnvironment, jobject __unused obj, jint samplerate, jint buffersize) {
     floatBuffer = (float *)malloc(sizeof(float) * 2 * buffersize + 128);
     player = new SuperpoweredAdvancedAudioPlayer(NULL, playerEventCallback, (unsigned int)samplerate, 0);
+    player->downloadSecondsAhead = HLS_DOWNLOAD_EVERYTHING;
     audioIO = new SuperpoweredAndroidAudioIO(samplerate, buffersize, false, true, audioProcessing, NULL, -1, SL_ANDROID_STREAM_MEDIA, buffersize * 2);
     spatializer = new SuperpoweredSpatializer((unsigned int)samplerate);
 }
@@ -62,9 +58,15 @@ extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_onBackgr
     audioIO->onBackground();
 }
 
-extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_Open(JNIEnv *javaEnvironment, jobject __unused obj, jstring url) {
+extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_OpenHLS(JNIEnv *javaEnvironment, jobject __unused obj, jstring url) {
     const char *str = javaEnvironment->GetStringUTFChars(url, 0);
     player->openHLS(str);
+    javaEnvironment->ReleaseStringUTFChars(url, str);
+}
+
+extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_OpenFile(JNIEnv *javaEnvironment, jobject __unused obj, jstring url) {
+    const char *str = javaEnvironment->GetStringUTFChars(url, 0);
+    player->open(str);
     javaEnvironment->ReleaseStringUTFChars(url, str);
 }
 
@@ -74,9 +76,15 @@ extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_Seek(JNI
 
 extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_SetAzimuth(JNIEnv * __unused javaEnvironment, jobject __unused obj, jfloat pos) {
     spatializer->azimuth = pos;
-    spatializer->elevation = 0;
+    spatializer->elevation = -10;
+    spatializer->reverbmix = 0.1;
     spatializer->sound2 = false;
 }
+
+extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_SetSpatialVolume(JNIEnv * __unused javaEnvironment, jobject __unused obj, float vol) {
+    spatializer->inputVolume = vol;
+}
+
 
 extern "C" JNIEXPORT void Java_com_superpowered_hlsexample_MainActivity_SetDownloadStrategy(JNIEnv * __unused javaEnvironment, jobject __unused obj, jint optionIndex) {
     switch (optionIndex) {

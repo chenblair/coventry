@@ -1,9 +1,17 @@
 package com.superpowered.hlsexample;
 
+import android.Manifest;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Location;
+import android.net.Uri;
+import android.os.PowerManager;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -27,6 +35,17 @@ import java.util.Locale;
 import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
+import android.widget.Toast;
+
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.ui.PlacePicker;
 
 //TRy max speed on rotation sensor
 //error location afterwards
@@ -37,15 +56,17 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Sensor rotVecSensor;
     private float[] rotationVector = new float[3];
     private float[] qVector = new float[4];
+    private FusedLocationProviderClient mFusedLocationClient;
+    private LocationCallback mLocationCallback;
+    PowerManager pm;
+    private PowerManager.WakeLock wakeLock;
+
+    private Location destinationLocation;
+    private Location currentLocation;
+    private Location startLocation;
 
 
-    // some HLS stream url-title pairs
-    private String[] urls = new String[] {
-            "https://devimages.apple.com.edgekey.net/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8", "Apple Advanced Example Stream",
-            "http://qthttp.apple.com.edgesuite.net/1010qwoeiuryfg/sl.m3u8", "Back to the Mac",
-            "http://playertest.longtailvideo.com/adaptive/bbbfull/bbbfull.m3u8", "JW Player Test",
-            "http://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8", "JW AES Encrypted"
-    };
+
 
     //private float bufferStartPercent = 0;
     private float bufferEndPercent = 0;
@@ -72,6 +93,21 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
+        // some HLS stream url-title pairs
+        final String[] urls = new String[] {
+                "http://blairc.com/coventry/gm.m3u8", "GM",
+                "http://blairc.com/coventry/gm2.m3u8", "GM2",
+                "http://blairc.com/coventry/gm3.m3u8", "GM3",
+                "http://blairc.com/coventry/gm4.m3u8", "GM4",
+                "https://devimages.apple.com.edgekey.net/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8", "Blips",
+                "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Man Down.mp3", "Man Down",
+                "http://playertest.longtailvideo.com/adaptive/bbbfull/bbbfull.m3u8", "Ambient Forest",
+                "http://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8", "Ocean Breeze",
+                "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Deuces.mp3", "Deuces",
+
+
+        };
 
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         rotVecSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
@@ -128,8 +164,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         });
 
         playPause = (Button)findViewById(R.id.playPause);
-        lastDownloadOption = (RadioButton)findViewById(R.id.downloadRemaining);
-        downloadOptions = (RadioGroup)findViewById(R.id.downloadOptions);
         ListView urlList = (ListView)findViewById(R.id.urlList);
         for (int n = 1; n < urls.length; n += 2) urlData.add(urls[n]);
         ArrayAdapter adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, urlData);
@@ -141,7 +175,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     view.setSelected(true);
                     if (position != selectedRow) {
                         selectedRow = position;
-                        Open(urls[position * 2]);
+                        OpenHLS(urls[position * 2]);
                     }
                 }
             });
@@ -189,6 +223,80 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         };
         mHandler = new Handler();
         mHandler.postDelayed(mRunnable, 50);
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        startPicker();
+        pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "wakelock");;
+        wakeLock.acquire();
+    }
+
+    protected void startPicker() {
+        int PLACE_PICKER_REQUEST = 1;
+        PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
+
+        try {
+            startActivityForResult(builder.build(this), PLACE_PICKER_REQUEST);
+        } catch (GooglePlayServicesRepairableException e) {
+            e.printStackTrace();
+        } catch (GooglePlayServicesNotAvailableException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        wakeLock.release();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (resultCode == RESULT_OK) {
+            Place place = PlacePicker.getPlace(this,data);
+            //String toastMsg = String.format("Place: %s", place.getName());
+            //Toast.makeText(this, toastMsg, Toast.LENGTH_LONG).show();
+            destinationLocation = new Location("");
+            destinationLocation.setLatitude(place.getLatLng().latitude);
+            destinationLocation.setLongitude(place.getLatLng().longitude);
+        }
+    }
+
+    private void startLocationUpdates() {
+        LocationRequest mLocationRequest = new LocationRequest();
+        mLocationRequest.setInterval(5000);
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
+        mLocationCallback = new LocationCallback() {
+
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                Location location = locationResult.getLastLocation();
+                    if (startLocation == null) {
+                        startLocation = location;
+                    }
+                    currentLocation = location;
+                    double latitude = location.getLatitude();
+                    double longitude = location.getLongitude();
+                    Log.v("GPS:", "IN ON LOCATION CHANGE, lat=" + latitude + ", lon=" + longitude);
+                    //Toast.makeText(getApplicationContext(), Double.toString(latitude), Toast.LENGTH_LONG).show();
+            }
+        };
+
+
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        69);
+        }
+        else {
+            mFusedLocationClient.requestLocationUpdates(mLocationRequest,
+                    mLocationCallback,
+                    null /* Looper */);
+        }
+
     }
 
     public void onPlayPause(View view) {
@@ -200,15 +308,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         Button btn = (Button)view;
         btn.setText(doubleSpeed ? "2x SPEED" : "1x SPEED");
         SetSpeed(doubleSpeed);
-    }
-
-    public void onDownloadOption(View view) {
-        RadioButton button = (RadioButton)view;
-        if (button == lastDownloadOption) return;
-        lastDownloadOption.setChecked(false);
-        lastDownloadOption = button;
-        button.setChecked(true);
-        SetDownloadStrategy(downloadOptions.indexOfChild(view));
     }
 
     @Override
@@ -225,22 +324,39 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+
             rotationVector = event.values;
             float[] rotationV = new float[16];
             SensorManager.getRotationMatrixFromVector(rotationV, rotationVector);
-
             float[] orientationValuesV = new float[3];
             SensorManager.getOrientation(rotationV, orientationValuesV);
             double horizAngle = orientationValuesV[0]*(180/Math.PI);
             horizAngle = (horizAngle + 180+90)%360;
             azimuthBar.setProgress((int)(azimuthBar.getMax()*(horizAngle/360)));
             Log.v("Azimuth",Double.toString(horizAngle));
-            SetAzimuth((float)(360.0-horizAngle));
+
+
+            float thetaDest = 0;
+            if (currentLocation != null && destinationLocation !=null) {
+                thetaDest = currentLocation.bearingTo(destinationLocation);
+
+                if (startLocation != null) {
+                    float scaleFactor = 1-(currentLocation.distanceTo(destinationLocation) / startLocation.distanceTo(destinationLocation));
+                    float vol = (float)Math.max(0.2,(-Math.log(-(scaleFactor-1.0)/scaleFactor)+3.0)/6.0);
+                    SetSpatialVolume((float)vol);
+                    Log.v("distToDest",Float.toString(currentLocation.distanceTo(destinationLocation)));
+                    Log.v("distStartDest",Float.toString(startLocation.distanceTo(destinationLocation)));
+                }
+
+            }
+
+            SetAzimuth((float)((360-horizAngle+thetaDest))%360);
+
         }
     }
 
     @Override
-    public void onAccuracyChanged(Sensor a, int s) {
+    public void onAccuracyChanged(Sensor a, int accuracy) {
 
     }
 
@@ -248,12 +364,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onResume() {
         super.onResume();
         onForeground();
-        mSensorManager.registerListener(this, rotVecSensor, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, rotVecSensor, SensorManager.SENSOR_DELAY_GAME);
+        startLocationUpdates();
     }
 
     @Override
     public void onPause() {
         super.onPause();
+        mFusedLocationClient.removeLocationUpdates(mLocationCallback);
         mSensorManager.unregisterListener(this);
         onBackground();
     }
@@ -267,9 +385,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private native void StartAudio(int samplerate, int buffersize);
     private native void onForeground();
     private native void onBackground();
-    private native void Open(String url);
+    private native void OpenHLS(String url);
+    private native void OpenFile(String url);
     private native void Seek(float percent);
     private native void SetAzimuth(float position);
+    private native void SetSpatialVolume(float volume);
     private native void SetDownloadStrategy(int optionIndex);
     private native void PlayPause();
     private native void SetSpeed(boolean fast);
