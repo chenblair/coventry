@@ -96,13 +96,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         // some HLS stream url-title pairs
         final String[] urls = new String[] {
-                "https://devimages.apple.com.edgekey.net/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8", "Apple Advanced Example Stream",
+                "http://blairc.com/coventry/gm.m3u8", "GM",
+                "http://blairc.com/coventry/gm2.m3u8", "GM2",
+                "http://blairc.com/coventry/gm3.m3u8", "GM3",
+                "http://blairc.com/coventry/gm4.m3u8", "GM4",
+                "https://devimages.apple.com.edgekey.net/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8", "Blips",
                 "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Man Down.mp3", "Man Down",
-                "http://playertest.longtailvideo.com/adaptive/bbbfull/bbbfull.m3u8", "JW Player Test",
-                "http://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8", "JW AES Encrypted",
-                "raw://fb.mp3", "FB",
-                Uri.parse("android.resource://"+this.getPackageName()+"/raw/gm").getPath(), "GM2",
-                Uri.parse("android.resource://"+this.getPackageName()+"/raw/gm.mp3").getPath(), "GM2"
+                "http://playertest.longtailvideo.com/adaptive/bbbfull/bbbfull.m3u8", "Ambient Forest",
+                "http://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8", "Ocean Breeze",
+                "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Deuces.mp3", "Deuces",
 
 
         };
@@ -173,7 +175,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     view.setSelected(true);
                     if (position != selectedRow) {
                         selectedRow = position;
-                        OpenFile(urls[position * 2]);
+                        OpenHLS(urls[position * 2]);
                     }
                 }
             });
@@ -276,7 +278,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double latitude = location.getLatitude();
                     double longitude = location.getLongitude();
                     Log.v("GPS:", "IN ON LOCATION CHANGE, lat=" + latitude + ", lon=" + longitude);
-                    Toast.makeText(getApplicationContext(), Double.toString(latitude), Toast.LENGTH_LONG).show();
+                    //Toast.makeText(getApplicationContext(), Double.toString(latitude), Toast.LENGTH_LONG).show();
             }
         };
 
@@ -339,7 +341,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 thetaDest = currentLocation.bearingTo(destinationLocation);
 
                 if (startLocation != null) {
-                    float scaleFactor = 1-(currentLocation.distanceTo(destinationLocation) / startLocation.distanceTo(destinationLocation));
+                    double scaleFactor = 1-(currentLocation.distanceTo(destinationLocation) / startLocation.distanceTo(destinationLocation));
+                    scaleFactor = Math.min(0.01d,scaleFactor);
                     float vol = (float)Math.max(0.2,(-Math.log(-(scaleFactor-1.0)/scaleFactor)+3.0)/6.0);
                     SetSpatialVolume((float)vol);
                     Log.v("distToDest",Float.toString(currentLocation.distanceTo(destinationLocation)));
