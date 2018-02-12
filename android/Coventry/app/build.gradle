@@ -7,7 +7,7 @@ android { // main settings for your application
     buildToolsVersion = '26.0.2'
 
     defaultConfig {
-        applicationId "com.superpowered.hlsexample"
+        applicationId "com.coventry.coventry"
         minSdkVersion 16 // more than 95% of all active Android devices
         targetSdkVersion 26
         versionCode 1
